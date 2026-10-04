@@ -36,43 +36,65 @@ function tipograf_options() {
 }
 
 /*
- * Обработка страниц: весь готовый HTML на сайте (тексты, заголовки, меню, поля, шаблоны темы).
+ * Обработка всего готового HTML на сайте: страницы (тексты, заголовки, меню, поля, шаблоны темы)
+ * и AJAX-ответы для посетителей (подгрузка записей, фильтры, живой поиск — HTML или JSON с HTML).
  */
 
-add_action( 'template_redirect', 'tipograf_start_buffer', 0 );
+add_action( 'template_redirect', 'tipograf_start_buffer', -1000 ); // обычные страницы и ?wc-ajax= (WooCommerce)
+add_action( 'admin_init', 'tipograf_start_buffer', 0 );           // admin-ajax.php
 
 function tipograf_start_buffer() {
-	if ( is_admin() || wp_doing_ajax() || wp_is_json_request() || is_feed() || is_robots() || is_trackback()
-		|| ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
-		return;
-	}
-	ob_start( 'tipograf_buffer' );
-}
-
-/*
- * AJAX-ответы с готовым HTML (например, «Показать ещё»): тема перечисляет свои действия в фильтре
- * add_filter( 'tipograf_ajax_actions', fn( $a ) => array_merge( $a, array( 'loadmore' ) ) );
- */
-
-add_action( 'admin_init', 'tipograf_start_ajax_buffer', 0 );
-
-function tipograf_start_ajax_buffer() {
-	if ( ! wp_doing_ajax() || ! isset( $_REQUEST['action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return;
-	}
-	$action = sanitize_key( wp_unslash( $_REQUEST['action'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-	if ( in_array( $action, (array) apply_filters( 'tipograf_ajax_actions', array() ), true ) ) {
+	if ( tipograf_should_process() ) {
 		ob_start( 'tipograf_buffer' );
 	}
 }
 
-function tipograf_buffer( $html ) {
-	foreach ( headers_list() as $header ) {
-		if ( 0 === stripos( $header, 'content-type:' ) && false === stripos( $header, 'text/html' ) ) {
-			return $html;
+function tipograf_should_process() {
+	if ( is_admin() || wp_doing_ajax() ) {
+		// AJAX — только со страниц сайта: ответы для админки (быстрое редактирование и т. п.) могут вернуться в базу.
+		$referer = wp_get_raw_referer();
+		$admin   = (string) wp_parse_url( admin_url(), PHP_URL_PATH );
+		if ( ! wp_doing_ajax() || ! $referer || false !== strpos( (string) wp_parse_url( $referer, PHP_URL_PATH ), $admin ) ) {
+			return false;
+		}
+	} elseif ( is_feed() || is_robots() || is_trackback() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+		return false;
+	}
+
+	// Многоязычные сайты (TranslatePress, WPML, Polylang): переводы ищутся по исходному тексту,
+	// поэтому страницы на других языках не трогаем.
+	$locale = get_locale();
+	if ( 0 !== strpos( $locale, 'ru' ) && ( get_option( 'WPLANG' ) ?: 'en_US' ) !== $locale ) {
+		return false;
+	}
+	// Редакторы прямо на странице (переводы, конструкторы): текст из них сохраняется обратно в базу.
+	foreach ( array( 'trp-edit-translation', 'elementor-preview', 'et_fb', 'fl_builder', 'ct_builder', 'bricks', 'vc_editable', 'tve', 'brizy-edit-iframe' ) as $editor ) {
+		if ( isset( $_GET[ $editor ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return false;
 		}
 	}
-	return Tipograf_Engine::process( $html, tipograf_options() );
+
+	return (bool) apply_filters( 'tipograf_enabled', true );
+}
+
+function tipograf_buffer( $body ) {
+	$type = 'text/html';
+	foreach ( headers_list() as $header ) {
+		if ( 0 === stripos( $header, 'content-type:' ) ) {
+			$type = strtolower( $header );
+		}
+	}
+
+	// JSON бывает и с заголовком text/html (admin-ajax.php по умолчанию).
+	$trimmed = ltrim( $body );
+	if ( false !== strpos( $type, 'json' )
+		|| ( '' !== $trimmed && in_array( $trimmed[0], array( '{', '[' ), true ) && null !== json_decode( $trimmed ) ) ) {
+		return Tipograf_Engine::process_json( $body, tipograf_options() );
+	}
+	if ( false !== strpos( $type, 'text/html' ) ) {
+		return Tipograf_Engine::process( $body, tipograf_options() );
+	}
+	return $body;
 }
 
 /*

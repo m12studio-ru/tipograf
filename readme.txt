@@ -24,6 +24,8 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Как работает:
 
 * Обрабатывает готовую страницу целиком при выдаче: тексты записей, заголовки, меню, поля, подписи в шаблонах темы.
+* Подгрузку без перезагрузки страницы («Показать ещё», фильтры, живой поиск) тоже обрабатывает сам — и HTML, и JSON с HTML внутри.
+* Админку, REST API, ленты, страницы на других языках многоязычного сайта (TranslatePress, WPML, Polylang) и визуальные конструкторы в режиме редактирования не трогает.
 * Трогает только видимый текст. Теги, атрибуты, ссылки, скрипты, стили, `<head>`, `<pre>` и `<code>` остаются как были.
 * Тексты в базе не меняются: выключили плагин — всё как раньше.
 * С кешем страниц (WP Super Cache, WP Rocket, LiteSpeed) обработка идёт один раз, когда страница попадает в кеш; после изменения настроек кеш сбрасывается сам.
@@ -32,7 +34,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 = English =
 
-Fixes hanging prepositions and conjunctions in Russian texts by inserting non-breaking spaces. Processes the final page HTML, touches only visible text.
+Fixes hanging prepositions and conjunctions in Russian texts by inserting non-breaking spaces. Processes the final page HTML and AJAX responses (HTML or JSON with HTML), touches only visible text.
 
 == Installation ==
 

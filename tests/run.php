@@ -25,7 +25,7 @@ $cases = array(
 	// Через строчные теги.
 	'в <a href="/x">доме</a>'                   => 'в&nbsp;<a href="/x">доме</a>',
 	'<strong>в</strong> доме'                   => '<strong>в</strong>&nbsp;доме',
-	'<p>Скейт-парк в</p><p>доме</p>'            => '<p>Скейт-парк в</p><p>доме</p>',
+	'<p>Дом в</p><p>лесу</p>'                  => '<p>Дом в</p><p>лесу</p>',
 	'в <br>доме'                                => 'в <br>доме',
 	// Теги, атрибуты, скрипты не трогаем.
 	'<img alt="в доме" title="на сайт">'        => '<img alt="в доме" title="на сайт">',
@@ -83,6 +83,23 @@ if ( 'с вами про&nbsp;дом' !== $own ) {
 	echo "FAIL own words: $own\n";
 }
 
-$total = count( $cases ) + 2;
+// JSON-ответы AJAX: только строки с HTML, данные не трогаем, пустые объекты остаются объектами.
+$json_cases = array(
+	'{"html":"<div>в доме</div>","title":"в доме","n":5,"o":{}}' => '{"html":"<div>в&nbsp;доме</div>","title":"в доме","n":5,"o":{}}',
+	'{"fragments":{"div.cart":"<a href=\\"/x\\">на сайт</a>"}}' => '{"fragments":{"div.cart":"<a href=\\"/x\\">на&nbsp;сайт</a>"}}',
+	'["<p>с вами</p>", "с вами"]'                     => '["<p>с&nbsp;вами</p>","с вами"]',
+	'{"title":"в доме"}'                              => '{"title":"в доме"}',
+	'не json в доме'                                  => 'не json в доме',
+	'{"":"<p>в доме</p>"}'                            => '{"":"<p>в доме</p>"}',
+);
+foreach ( $json_cases as $in => $want ) {
+	$got = Tipograf_Engine::process_json( $in );
+	if ( $got !== $want ) {
+		$fail++;
+		echo "FAIL json\n  in:   $in\n  want: $want\n  got:  $got\n";
+	}
+}
+
+$total = count( $cases ) + count( $json_cases ) + 2;
 echo $fail ? "\n$fail of $total failed\n" : "OK, $total checks\n";
 exit( $fail ? 1 : 0 );

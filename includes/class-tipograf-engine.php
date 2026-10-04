@@ -60,6 +60,52 @@ final class Tipograf_Engine {
 		return null === $result ? $html : $result;
 	}
 
+	/**
+	 * JSON-ответ AJAX (фильтры, поиск, «Показать ещё»): обрабатываются только строки с HTML-тегами,
+	 * простые строки могут быть данными (адреса, ключи, значения полей) — их не трогаем.
+	 *
+	 * @param string $json    Тело ответа.
+	 * @param array  $options Как в process().
+	 */
+	public static function process_json( $json, array $options = array() ) {
+		$data = json_decode( $json );
+		if ( null === $data || is_scalar( $data ) && ! is_string( $data ) ) {
+			return $json; // не JSON или просто число
+		}
+		$changed = false;
+		$data    = self::walk_json( $data, $options, $changed );
+		if ( ! $changed ) {
+			return $json;
+		}
+		$out = json_encode( $data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		return false === $out ? $json : $out;
+	}
+
+	private static function walk_json( $value, array $options, &$changed ) {
+		if ( is_string( $value ) ) {
+			if ( preg_match( '/<[a-z!\/]/i', $value ) ) {
+				$new     = self::process( $value, $options );
+				$changed = $changed || $new !== $value;
+				return $new;
+			}
+			return $value;
+		}
+		if ( is_array( $value ) || is_object( $value ) ) {
+			foreach ( $value as $key => $item ) {
+				if ( '' === $key ) {
+					continue; // пустое имя свойства у объекта не записать обратно
+				}
+				$item = self::walk_json( $item, $options, $changed );
+				if ( is_array( $value ) ) {
+					$value[ $key ] = $item;
+				} else {
+					$value->$key = $item;
+				}
+			}
+		}
+		return $value;
+	}
+
 	private function run( $html, array $o ) {
 		$in = '(?:' . self::TAG_INLINE . ')*';
 

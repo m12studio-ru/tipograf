@@ -35,14 +35,22 @@ Each rule can be turned on and off separately in **Settings → Typograph**.
 
 The admin interface is in English and switches to Russian on Russian-language sites.
 
-## AJAX-loaded content
+## Content loaded without a page reload
 
-The plugin processes regular pages. If your theme loads HTML through `admin-ajax.php` (a "Load more" button, for example), list those actions in a filter:
+"Load more" buttons, catalog filters and live search often load posts through AJAX. The plugin processes these responses on its own, with no setup: plain HTML as well as JSON that carries HTML. Plain strings inside JSON are left alone, since they may be data: URLs, keys, field values.
+
+Not processed:
+
+- requests from the admin area, so non-breaking spaces never get saved back to the database;
+- the REST API, RSS feeds, robots.txt, sitemaps and other non-HTML responses;
+- pages in other languages on multilingual sites (TranslatePress, WPML, Polylang): translations are matched by the original text;
+- pages open in the TranslatePress translation editor or in a visual page builder (Elementor, Divi, Beaver Builder, Oxygen, Bricks, WPBakery, Thrive, Brizy): text from there is saved back to the database.
+
+To turn processing off on particular pages, use a filter:
 
 ```php
-add_filter( 'tipograf_ajax_actions', function ( $actions ) {
-	$actions[] = 'loadmore';
-	return $actions;
+add_filter( 'tipograf_enabled', function ( $enabled ) {
+	return $enabled && ! is_page( 'contacts' );
 } );
 ```
 
