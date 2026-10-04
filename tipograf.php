@@ -49,6 +49,23 @@ function tipograf_start_buffer() {
 	ob_start( 'tipograf_buffer' );
 }
 
+/*
+ * AJAX-ответы с готовым HTML (например, «Показать ещё»): тема перечисляет свои действия в фильтре
+ * add_filter( 'tipograf_ajax_actions', fn( $a ) => array_merge( $a, array( 'loadmore' ) ) );
+ */
+
+add_action( 'admin_init', 'tipograf_start_ajax_buffer', 0 );
+
+function tipograf_start_ajax_buffer() {
+	if ( ! wp_doing_ajax() || ! isset( $_REQUEST['action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return;
+	}
+	$action = sanitize_key( wp_unslash( $_REQUEST['action'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if ( in_array( $action, (array) apply_filters( 'tipograf_ajax_actions', array() ), true ) ) {
+		ob_start( 'tipograf_buffer' );
+	}
+}
+
 function tipograf_buffer( $html ) {
 	foreach ( headers_list() as $header ) {
 		if ( 0 === stripos( $header, 'content-type:' ) && false === stripos( $header, 'text/html' ) ) {
